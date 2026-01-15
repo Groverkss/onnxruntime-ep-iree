@@ -2,7 +2,6 @@
 
 #include "iree_ep_factory.h"
 
-#include <format>
 #include <memory>
 
 #include "iree_ep.h"

@@ -2,8 +2,8 @@
 //
 // Following the coding style requirement that all IREE C objects must use RAII.
 
-#ifndef IREE_ONNX_EP_IREE_WRAPPERS_H_
-#define IREE_ONNX_EP_IREE_WRAPPERS_H_
+#ifndef IREE_ONNX_EP_SRC_IREE_WRAPPERS_H_
+#define IREE_ONNX_EP_SRC_IREE_WRAPPERS_H_
 
 #include <string>
 
@@ -112,6 +112,7 @@ class RuntimeCall {
   RuntimeCall& operator=(const RuntimeCall&) = delete;
 
   iree_runtime_call_t* Get() { return &call_; }
+  const iree_runtime_call_t* Get() const { return &call_; }
 
   void MarkInitialized() { initialized_ = true; }
 
@@ -183,4 +184,4 @@ inline OrtStatus* IreeStatusToOrtStatus(iree_status_t status) {
 
 }  // namespace iree_onnx_ep
 
-#endif  // IREE_ONNX_EP_IREE_WRAPPERS_H_
+#endif  // IREE_ONNX_EP_SRC_IREE_WRAPPERS_H_

@@ -1,7 +1,7 @@
 // temp_file.h - RAII wrapper for temporary files.
 
-#ifndef IREE_ONNX_EP_TEMP_FILE_H_
-#define IREE_ONNX_EP_TEMP_FILE_H_
+#ifndef IREE_ONNX_EP_SRC_TEMP_FILE_H_
+#define IREE_ONNX_EP_SRC_TEMP_FILE_H_
 
 #include <string>
 #include <string_view>
@@ -37,4 +37,4 @@ class TempFile {
 
 }  // namespace iree_onnx_ep
 
-#endif  // IREE_ONNX_EP_TEMP_FILE_H_
+#endif  // IREE_ONNX_EP_SRC_TEMP_FILE_H_

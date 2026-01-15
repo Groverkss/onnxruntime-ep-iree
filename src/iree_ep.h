@@ -3,8 +3,8 @@
 // This file defines the IreeEp class which handles graph partitioning,
 // compilation, and execution using IREE as the backend.
 
-#ifndef IREE_ONNX_EP_IREE_EP_H_
-#define IREE_ONNX_EP_IREE_EP_H_
+#ifndef IREE_ONNX_EP_SRC_IREE_EP_H_
+#define IREE_ONNX_EP_SRC_IREE_EP_H_
 
 #include <string>
 
@@ -107,6 +107,7 @@ struct IreeNodeComputeInfo : OrtNodeComputeInfo {
   static void ORT_API_CALL ReleaseStateImpl(OrtNodeComputeInfo* this_ptr,
                                             void* compute_state) noexcept;
 
+  // Non-owning reference to parent EP. The EP must outlive this compute info.
   IreeEp& ep;
 
   // IREE runtime state for this compiled subgraph.
@@ -116,4 +117,4 @@ struct IreeNodeComputeInfo : OrtNodeComputeInfo {
 
 }  // namespace iree_onnx_ep
 
-#endif  // IREE_ONNX_EP_IREE_EP_H_
+#endif  // IREE_ONNX_EP_SRC_IREE_EP_H_

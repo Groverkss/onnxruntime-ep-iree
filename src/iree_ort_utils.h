@@ -3,8 +3,8 @@
 // Provides element type mapping between ONNX and IREE, and buffer/tensor
 // conversion utilities for data transfer between ORT and IREE runtime.
 
-#ifndef IREE_ONNX_EP_IREE_ORT_UTILS_H_
-#define IREE_ONNX_EP_IREE_ORT_UTILS_H_
+#ifndef IREE_ONNX_EP_SRC_IREE_ORT_UTILS_H_
+#define IREE_ONNX_EP_SRC_IREE_ORT_UTILS_H_
 
 #include <vector>
 
@@ -77,4 +77,4 @@ size_t CalculateTensorByteSize(const std::vector<int64_t>& shape,
 
 }  // namespace iree_onnx_ep
 
-#endif  // IREE_ONNX_EP_IREE_ORT_UTILS_H_
+#endif  // IREE_ONNX_EP_SRC_IREE_ORT_UTILS_H_

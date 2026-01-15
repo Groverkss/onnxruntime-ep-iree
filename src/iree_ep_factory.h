@@ -1,7 +1,7 @@
 // iree_ep_factory.h - IREE Execution Provider Factory
 
-#ifndef IREE_ONNX_EP_IREE_EP_FACTORY_H_
-#define IREE_ONNX_EP_IREE_EP_FACTORY_H_
+#ifndef IREE_ONNX_EP_SRC_IREE_EP_FACTORY_H_
+#define IREE_ONNX_EP_SRC_IREE_EP_FACTORY_H_
 
 #include <string>
 
@@ -99,4 +99,4 @@ class IreeEpFactory : public OrtEpFactory, public ApiPtrs {
 
 }  // namespace iree_onnx_ep
 
-#endif  // IREE_ONNX_EP_IREE_EP_FACTORY_H_
+#endif  // IREE_ONNX_EP_SRC_IREE_EP_FACTORY_H_

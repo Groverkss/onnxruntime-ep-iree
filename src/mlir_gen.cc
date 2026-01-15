@@ -36,7 +36,7 @@ std::string SanitizeName(const std::string& name) {
 }
 
 // Joins a vector of strings with a separator.
-std::string Join(std::vector<std::string> parts, const std::string& sep) {
+std::string Join(const std::vector<std::string>& parts, const std::string& sep) {
   std::ostringstream ss;
   for (size_t i = 0; i < parts.size(); ++i) {
     if (i > 0) {
