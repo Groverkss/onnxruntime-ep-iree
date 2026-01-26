@@ -32,10 +32,12 @@ def test_ep_load():
     print("EP plugin registered successfully")
 
     # Get IREE device
+    iree_driver = "vulkan"
     ep_devices = ort.get_ep_devices()
     iree_device = None
     for dev in ep_devices:
-        if dev.ep_name == "IREE":
+        print(dev.device.device_id)
+        if dev.device.metadata.get("iree.driver") == iree_driver:
             iree_device = dev
             break
 
@@ -82,9 +84,7 @@ def test_ep_load():
 
         # Provider options for IREE EP.
         provider_options = {
-            "device": "hip",
-            "target_arch": "gfx1201",
-            "opt_level": "O3",
+            "target_arch": "vulkan-spirv",
             "save_intermediates": "1",
         }
         sess_options.add_provider_for_devices([iree_device], provider_options)

@@ -46,6 +46,12 @@ IreeEpFactory::IreeEpFactory(const char* ep_name, ApiPtrs apis,
   }
 }
 
+IreeEpFactory::~IreeEpFactory() {
+  for (auto* hw_device : virtual_hw_devices_) {
+    ep_api.ReleaseHardwareDevice(hw_device);
+  }
+}
+
 // Factory interface implementations
 
 /*static*/
@@ -75,27 +81,91 @@ IreeEpFactory::GetVersionImpl(const OrtEpFactory* /*this_ptr*/) noexcept {
 
 /*static*/
 OrtStatus* ORT_API_CALL IreeEpFactory::GetSupportedDevicesImpl(
-    OrtEpFactory* this_ptr, const OrtHardwareDevice* const* devices,
-    size_t num_devices, OrtEpDevice** ep_devices, size_t max_ep_devices,
+    OrtEpFactory* this_ptr, const OrtHardwareDevice* const* /*devices*/,
+    size_t /*num_devices*/, OrtEpDevice** ep_devices, size_t max_ep_devices,
     size_t* p_num_ep_devices) noexcept {
   auto* factory = static_cast<IreeEpFactory*>(this_ptr);
   size_t& num_ep_devices = *p_num_ep_devices;
   num_ep_devices = 0;
 
-  // Report supported devices.
-  for (size_t i = 0; i < num_devices && num_ep_devices < max_ep_devices; ++i) {
-    const OrtHardwareDevice& device = *devices[i];
-    OrtHardwareDeviceType device_type =
-        factory->ort_api.HardwareDevice_Type(&device);
-    // Report support for CPU and GPU devices. We could really also report
-    // support for NPU devices if we ship some NPU drivers with IREE, but we
-    // don't today afaik.
-    bool supported = device_type == OrtHardwareDeviceType_CPU ||
-                     device_type == OrtHardwareDeviceType_GPU;
-    if (supported) {
+  iree_allocator_t allocator = iree_allocator_system();
+  iree_hal_driver_registry_t* registry =
+      iree_runtime_instance_driver_registry(factory->instance_.Get());
+
+  // Enumerate drivers.
+  iree_host_size_t driver_count = 0;
+  IreeAllocatedPtr<iree_hal_driver_info_t> driver_infos(allocator);
+  iree_status_t status = iree_hal_driver_registry_enumerate(
+      registry, allocator, &driver_count, driver_infos.ForOutput());
+  if (!iree_status_is_ok(status)) {
+    iree_status_ignore(status);
+    return nullptr;  // No drivers available.
+  }
+
+  size_t device_index = 0;
+  for (iree_host_size_t i = 0; i < driver_count; ++i) {
+    // Get driver name as std::string.
+    iree_string_view_t driver_name = driver_infos.Get()[i].driver_name;
+    std::string driver_name_str(driver_name.data, driver_name.size);
+
+    // Create driver.
+    HalDriverPtr driver;
+    status = iree_hal_driver_registry_try_create(registry, driver_name,
+                                                 allocator, driver.ForOutput());
+    if (!iree_status_is_ok(status)) {
+      iree_status_ignore(status);
+      continue;
+    }
+
+    // Query devices.
+    iree_host_size_t device_count = 0;
+    IreeAllocatedPtr<iree_hal_device_info_t> device_infos(allocator);
+    status = iree_hal_driver_query_available_devices(
+        driver.Get(), allocator, &device_count, device_infos.ForOutput());
+    if (!iree_status_is_ok(status)) {
+      iree_status_ignore(status);
+      continue;
+    }
+
+    for (iree_host_size_t j = 0;
+         j < device_count && num_ep_devices < max_ep_devices; ++j) {
+      // Get device path.
+      iree_string_view_t device_path = device_infos.Get()[j].path;
+      std::string device_path_str(device_path.data, device_path.size);
+
+      // Create metadata with is_virtual, driver name, and device path.
+      OrtKeyValuePairs* hw_metadata = nullptr;
+      factory->ort_api.CreateKeyValuePairs(&hw_metadata);
+      // TODO: ORT should expose kOrtHardwareDevice_MetadataKey_IsVirtual
+      // through the public API.
+      factory->ort_api.AddKeyValuePair(hw_metadata, "is_virtual", "1");
+      factory->ort_api.AddKeyValuePair(hw_metadata, "iree.driver",
+                                       driver_name_str.c_str());
+      factory->ort_api.AddKeyValuePair(hw_metadata, "iree.device_path",
+                                       device_path_str.c_str());
+
+      // Determine device type based on driver.
+      OrtHardwareDeviceType device_type =
+          (driver_name_str == "local-task" || driver_name_str == "local-sync")
+              ? OrtHardwareDeviceType_CPU
+              : OrtHardwareDeviceType_GPU;
+
+      // Create virtual OrtHardwareDevice.
+      OrtHardwareDevice* hw_device = nullptr;
+      OrtStatus* ort_status = factory->ep_api.CreateHardwareDevice(
+          device_type, kEpVendorId, static_cast<uint32_t>(device_index++),
+          kEpVendor, hw_metadata, &hw_device);
+      factory->ort_api.ReleaseKeyValuePairs(hw_metadata);
+      if (ort_status != nullptr) {
+        return ort_status;
+      }
+
+      factory->virtual_hw_devices_.push_back(hw_device);
+
+      // Create OrtEpDevice for this hardware device.
       OrtEpDevice* ep_device = nullptr;
       ORT_RETURN_IF_ERROR(factory->ep_api.CreateEpDevice(
-          factory, &device, nullptr, nullptr, &ep_device));
+          factory, hw_device, nullptr, nullptr, &ep_device));
       ep_devices[num_ep_devices++] = ep_device;
     }
   }
@@ -124,12 +194,27 @@ OrtStatus* ORT_API_CALL IreeEpFactory::CreateEpImpl(
         .release();
   }
 
+  // Get driver and device path from hardware device metadata.
+  const OrtHardwareDevice& hardware_device = *devices[0];
+  const OrtKeyValuePairs* hw_metadata =
+      factory->ort_api.HardwareDevice_Metadata(&hardware_device);
+  const char* driver_name =
+      factory->ort_api.GetKeyValue(hw_metadata, "iree.driver");
+  const char* device_path =
+      factory->ort_api.GetKeyValue(hw_metadata, "iree.device_path");
+  if (driver_name == nullptr || device_path == nullptr) {
+    return Ort::Status(
+               "IREE EP: Driver or device path not found in hardware device "
+               "metadata",
+               ORT_INVALID_ARGUMENT)
+        .release();
+  }
+
   // Parse configuration from session options config entries.
   // The Python API stores options with "ep.iree." prefix.
   IreeEp::Config config = {};
   if (session_options != nullptr) {
     Ort::ConstSessionOptions sess_opts(session_options);
-    config.device = sess_opts.GetConfigEntryOrDefault("ep.iree.device", "");
     config.target_arch =
         sess_opts.GetConfigEntryOrDefault("ep.iree.target_arch", "");
     config.opt_level =
@@ -139,22 +224,23 @@ OrtStatus* ORT_API_CALL IreeEpFactory::CreateEpImpl(
         "1";
   }
 
-  ORT_CXX_LOGF_NOEXCEPT(factory->logger_, ORT_LOGGING_LEVEL_INFO,
-                        "IREE EP: Creating EP with device='%s', "
-                        "target_arch='%s', opt_level='%s'",
-                        config.device.c_str(), config.target_arch.c_str(),
-                        config.opt_level.c_str());
-
-  // Perform configuration validation.
-  //
-  // 1. Require a device to be specified.
-  // 2. Require target_arch to be specified for non-CPU devices.
-  if (config.device.empty()) {
-    return Ort::Status("IREE EP: 'device' option must be specified",
+  // Select backend based on driver.
+  std::string driver_str(driver_name);
+  if (driver_str == "vulkan") {
+    config.backend = "vulkan";
+  } else if (driver_str == "cuda") {
+    config.backend = "cuda";
+  } else if (driver_str == "hip") {
+    config.backend = "hip";
+  } else if (driver_str == "local-task" || driver_str == "local-sync") {
+    config.backend = "llvm-cpu";
+  } else {
+    return Ort::Status(("IREE EP: Unknown driver: " + driver_str).c_str(),
                        ORT_INVALID_ARGUMENT)
         .release();
   }
-  const OrtHardwareDevice& hardware_device = *devices[0];
+
+  // Require target_arch for non-CPU devices.
   OrtHardwareDeviceType device_type =
       factory->ort_api.HardwareDevice_Type(&hardware_device);
   if (device_type != OrtHardwareDeviceType_CPU && config.target_arch.empty()) {
@@ -165,37 +251,19 @@ OrtStatus* ORT_API_CALL IreeEpFactory::CreateEpImpl(
         .release();
   }
 
-  // Get device from the device string: device(://id)? to device.
-  std::string driver_string = config.device;
-  size_t pos = driver_string.find("://");
-  if (pos != std::string::npos) {
-    driver_string = driver_string.substr(0, pos);
-  }
+  ORT_CXX_LOGF_NOEXCEPT(factory->logger_, ORT_LOGGING_LEVEL_INFO,
+                        "IREE EP: Creating EP with driver='%s', "
+                        "device_path='%s', target_arch='%s', opt_level='%s'",
+                        driver_name, device_path, config.target_arch.c_str(),
+                        config.opt_level.c_str());
 
-  // Select the backend based on the driver. We could in future expose this
-  // as an user option.
-  if (config.backend.empty()) {
-    if (driver_string == "vulkan") {
-      config.backend = "vulkan";
-    } else if (driver_string == "cuda") {
-      config.backend = "cuda";
-    } else if (driver_string == "hip") {
-      config.backend = "hip";
-    } else if (driver_string == "local-task" || driver_string == "local-sync") {
-      config.backend = "llvm-cpu";
-    } else {
-      return Ort::Status("IREE EP: Unknown driver", ORT_INVALID_ARGUMENT)
-          .release();
-    }
-  }
-
-  // Create IREE HAL device.
-  // TODO: This is bad, we should be using iree_hal_driver_create_device_by_uri
-  // directly, otherwise we are not respecting the uri format the user gave us.
+  // Build device URI and create HAL device.
+  std::string device_uri = driver_str + "://" + device_path;
   HalDevicePtr hal_device;
-  iree_status_t status = iree_runtime_instance_try_create_default_device(
-      factory->IreeInstance(), iree_make_cstring_view(driver_string.c_str()),
-      hal_device.ForOutput());
+  iree_status_t status = iree_hal_create_device(
+      iree_runtime_instance_driver_registry(factory->IreeInstance()),
+      iree_make_string_view(device_uri.data(), device_uri.size()),
+      iree_allocator_system(), hal_device.ForOutput());
   if (!iree_status_is_ok(status)) {
     return IreeStatusToOrtStatus(status);
   }

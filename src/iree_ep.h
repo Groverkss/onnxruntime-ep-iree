@@ -24,20 +24,11 @@ class IreeEp : public OrtEp, public ApiPtrs {
  public:
   struct Config {
     bool enable_ep_context = false;
-    // Target device for IREE: target://id . For example:
-    // "vulkan://0",
-    // "cuda://1",
-    // "local-task://0",
-    // "hip://GPU-00000000-1111-2222-3333-444444444444".
-    //
-    // TODO: In future, we may want to not support adding an explicit id here
-    // and instead query it directly from the OrtHardwareDevice.
-    std::string device = "";
     // Target architecture to compile for.
     std::string target_arch = "";  // e.g., "gfx1100", "mi300x"
     // Optimization level for the IREE compiler: O0, O1, O2, O3
     std::string opt_level = "O0";
-    // Backend to use for the device.
+    // Backend to use for the device (derived from driver name).
     std::string backend = "";
     // Save intermediate compilation artifacts (MLIR, VMFB) for debugging.
     bool save_intermediates = false;

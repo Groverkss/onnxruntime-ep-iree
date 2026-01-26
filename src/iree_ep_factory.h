@@ -4,6 +4,7 @@
 #define IREE_ONNX_EP_SRC_IREE_EP_FACTORY_H_
 
 #include <string>
+#include <vector>
 
 #include "iree_wrappers.h"
 #include "ort_import.h"
@@ -37,6 +38,7 @@ struct ApiPtrs {
 class IreeEpFactory : public OrtEpFactory, public ApiPtrs {
  public:
   IreeEpFactory(const char* ep_name, ApiPtrs apis, const OrtLogger* default_logger);
+  ~IreeEpFactory();
 
   // Accessor for the shared IREE runtime instance.
   iree_runtime_instance_t* IreeInstance() const { return instance_.Get(); }
@@ -95,6 +97,10 @@ class IreeEpFactory : public OrtEpFactory, public ApiPtrs {
 
   // IREE runtime instance (shared across all EPs created by this factory).
   RuntimeInstancePtr instance_;
+
+  // Virtual OrtHardwareDevice instances created by this factory.
+  // Owned by the factory and released in the destructor.
+  std::vector<OrtHardwareDevice*> virtual_hw_devices_;
 };
 
 }  // namespace iree_onnx_ep

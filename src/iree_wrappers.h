@@ -89,6 +89,60 @@ using HalDevicePtr = IreePtr<iree_hal_device_t,
                              iree_hal_device_retain,
                              iree_hal_device_release>;
 
+using HalDriverPtr = IreePtr<iree_hal_driver_t,
+                             iree_hal_driver_retain,
+                             iree_hal_driver_release>;
+
+// RAII wrapper for memory allocated by IREE that needs iree_allocator_free.
+template <typename T>
+class IreeAllocatedPtr {
+ public:
+  explicit IreeAllocatedPtr(iree_allocator_t allocator)
+      : allocator_(allocator), ptr_(nullptr) {}
+
+  ~IreeAllocatedPtr() {
+    if (ptr_) {
+      iree_allocator_free(allocator_, ptr_);
+    }
+  }
+
+  // Move-only semantics.
+  IreeAllocatedPtr(IreeAllocatedPtr&& other) noexcept
+      : allocator_(other.allocator_), ptr_(other.ptr_) {
+    other.ptr_ = nullptr;
+  }
+
+  IreeAllocatedPtr& operator=(IreeAllocatedPtr&& other) noexcept {
+    if (this != &other) {
+      if (ptr_) {
+        iree_allocator_free(allocator_, ptr_);
+      }
+      allocator_ = other.allocator_;
+      ptr_ = other.ptr_;
+      other.ptr_ = nullptr;
+    }
+    return *this;
+  }
+
+  IreeAllocatedPtr(const IreeAllocatedPtr&) = delete;
+  IreeAllocatedPtr& operator=(const IreeAllocatedPtr&) = delete;
+
+  // For passing to IREE API out parameters.
+  T** ForOutput() {
+    if (ptr_) {
+      iree_allocator_free(allocator_, ptr_);
+      ptr_ = nullptr;
+    }
+    return &ptr_;
+  }
+
+  T* Get() const { return ptr_; }
+
+ private:
+  iree_allocator_t allocator_;
+  T* ptr_;
+};
+
 using HalBufferViewPtr = IreePtr<iree_hal_buffer_view_t,
                                  iree_hal_buffer_view_retain,
                                  iree_hal_buffer_view_release>;

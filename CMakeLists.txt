@@ -95,6 +95,8 @@ set(IREE_HAL_DRIVER_LOCAL_TASK ON)
 # Enable HIP driver for ROCm GPU execution.
 set(IREE_HAL_DRIVER_HIP ON)
 set(IREE_HIP_TEST_TARGET_CHIP "" CACHE STRING "Enable ROCm testing on specific architecture (e.g. gfx942)")
+# Enable Vulkan driver for GPU execution.
+set(IREE_HAL_DRIVER_VULKAN ON)
 
 if(IREE_SOURCE_DIR)
   message(STATUS "Using existing IREE sources: ${IREE_SOURCE_DIR}")
@@ -102,7 +104,15 @@ if(IREE_SOURCE_DIR)
 else()
   message(STATUS "Fetching IREE sources from tag ${IREE_GIT_TAG}")
   # TODO: Do we need the benchmark submodule?
-  set(IREE_SUBMODULES "third_party/benchmark third_party/flatcc third_party/hip-build-deps")
+  set(IREE_SUBMODULES "third_party/benchmark third_party/flatcc")
+  # Add hip-build-deps submodule only if HIP driver is enabled.
+  if(IREE_HAL_DRIVER_HIP)
+    list(APPEND IREE_SUBMODULES "third_party/hip-build-deps")
+  endif()
+  # Add vulkan_headers submodule only if Vulkan driver is enabled.
+  if(IREE_HAL_DRIVER_VULKAN)
+    list(APPEND IREE_SUBMODULES "third_party/vulkan_headers")
+  endif()
   FetchContent_Declare(
     iree
     GIT_REPOSITORY https://github.com/iree-org/iree.git
