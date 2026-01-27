@@ -92,6 +92,10 @@ OrtStatus* ORT_API_CALL IreeEpFactory::GetSupportedDevicesImpl(
   iree_hal_driver_registry_t* registry =
       iree_runtime_instance_driver_registry(factory->instance_.Get());
 
+  // TODO: What happens if this function is called multiple times? We should
+  // probably check if virtual_hw_devices_ is already populated and skip
+  // re-enumeration, as that add duplicate devices.
+
   // Enumerate drivers.
   iree_host_size_t driver_count = 0;
   IreeAllocatedPtr<iree_hal_driver_info_t> driver_infos(allocator);
@@ -127,6 +131,14 @@ OrtStatus* ORT_API_CALL IreeEpFactory::GetSupportedDevicesImpl(
       continue;
     }
 
+    // Create virtual Ort devices for each IREE device available.
+    //
+    // Given an OrtHardwareDevice, Ort can find which virtual hardware device
+    // it is by checking it's vendor id (should be kEpVendorId) and the device
+    // id (the index it's stored in virtual_hw_devices_)
+    //
+    // IREE can identify the device using the driver and device path stored in
+    // the hardware device metadata.
     for (iree_host_size_t j = 0;
          j < device_count && num_ep_devices < max_ep_devices; ++j) {
       // Get device path.
@@ -144,11 +156,11 @@ OrtStatus* ORT_API_CALL IreeEpFactory::GetSupportedDevicesImpl(
       factory->ort_api.AddKeyValuePair(hw_metadata, "iree.device_path",
                                        device_path_str.c_str());
 
-      // Determine device type based on driver.
-      OrtHardwareDeviceType device_type =
-          (driver_name_str == "local-task" || driver_name_str == "local-sync")
-              ? OrtHardwareDeviceType_CPU
-              : OrtHardwareDeviceType_GPU;
+      // TODO: We are pretending here that all IREE devices are GPUs. This is
+      // because we follow a host <-> device model in IREE. How does this
+      // matter in practice? If we are using IREE APIs anyway, does it matter
+      // if we set this to CPU?
+      OrtHardwareDeviceType device_type = OrtHardwareDeviceType_GPU;
 
       // Create virtual OrtHardwareDevice.
       OrtHardwareDevice* hw_device = nullptr;
