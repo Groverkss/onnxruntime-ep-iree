@@ -7,12 +7,10 @@
 
 namespace iree_onnx_ep {
 
-IreeAllocator::IreeAllocator(const ApiPtrs& api_ptrs, uint32_t device_id,
-                             iree_hal_device_t* device,
+IreeAllocator::IreeAllocator(uint32_t device_id, iree_hal_device_t* device,
                              const OrtMemoryInfo* memory_info,
                              const Ort::Logger& logger)
-    : api_ptrs_(api_ptrs),
-      device_id_(device_id),
+    : device_id_(device_id),
       device_(device),
       memory_info_(memory_info),
       logger_(logger) {

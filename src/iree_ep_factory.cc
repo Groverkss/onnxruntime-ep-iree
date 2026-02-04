@@ -461,7 +461,7 @@ OrtStatus* ORT_API_CALL IreeEpFactory::CreateAllocatorImpl(
 
   // Create the allocator.
   auto alloc = std::make_unique<IreeAllocator>(
-      *factory, device_id, device, allocator_memory_info, factory->logger_);
+      device_id, device, allocator_memory_info, factory->logger_);
 
   ORT_CXX_LOGF_NOEXCEPT(factory->logger_, ORT_LOGGING_LEVEL_INFO,
                         "IREE EP: Created allocator for device %u", device_id);

@@ -31,14 +31,12 @@ class IreeAllocator : public OrtAllocator {
   // Creates an allocator for the specified device.
   //
   // Args:
-  //   api_ptrs: ORT and EP API function pointers.
   //   device_id: The IREE device ID (index in hw_devices_ list).
   //   device: Non-owning pointer to the HAL device. Must outlive this
   //   allocator. memory_info: ORT memory info describing this allocator. Takes
   //   ownership. logger: Logger for allocation tracing.
-  IreeAllocator(const ApiPtrs& api_ptrs, uint32_t device_id,
-                iree_hal_device_t* device, const OrtMemoryInfo* memory_info,
-                const Ort::Logger& logger);
+  IreeAllocator(uint32_t device_id, iree_hal_device_t* device,
+                const OrtMemoryInfo* memory_info, const Ort::Logger& logger);
 
   ~IreeAllocator();
 
@@ -61,7 +59,6 @@ class IreeAllocator : public OrtAllocator {
   // Returns the memory info describing this allocator.
   static const OrtMemoryInfo* ORT_API_CALL InfoImpl(const OrtAllocator* this_);
 
-  const ApiPtrs& api_ptrs_;
   uint32_t device_id_;
   iree_hal_device_t* device_;         // Non-owning (owned by factory/EP).
   const OrtMemoryInfo* memory_info_;  // Non-owning (owned by factory).
