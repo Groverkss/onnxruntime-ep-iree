@@ -23,8 +23,16 @@ include(FetchContent)
 #
 ################################################################################
 
-set(ONNXRUNTIME_VERSION "1.23.2")
+set(ONNXRUNTIME_VERSION "1.24.0")
 set(ONNXRUNTIME_SOURCE_DIR "" CACHE FILEPATH "Path to ONNX Runtime source")
+
+# We are currently using the nightly 1.24.0 release, which isn't available as a
+# stable release yet, so force users to specify ONNXRUNTIME_SOURCE_DIR for now.
+if (NOT ONNXRUNTIME_SOURCE_DIR)
+  message(FATAL_ERROR
+    "ONNXRUNTIME_SOURCE_DIR is not set.\n"
+    "Since onnxruntime v1.24.0, please clone the onnnxruntime repo from https://github.com/microsoft/onnxruntime.git, checkout the rel-1.24.0 branch and add -DONNXRUNTIME_SOURCE_DIR=/path/to/onnxruntime to your cmake command.")
+endif()
 
 if(ONNXRUNTIME_SOURCE_DIR)
   message(STATUS "Using existing ONNX Runtime sources: ${ONNXRUNTIME_SOURCE_DIR}")
