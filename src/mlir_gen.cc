@@ -340,24 +340,48 @@ class MlirGenerator {
     // Build output SSA names and types.
     std::ostringstream out_names;
     std::ostringstream out_types;
+    bool first_output = true;
     for (size_t i = 0; i < outputs.size(); ++i) {
-      if (i > 0) {
+      // Skip invalid outputs (optional outputs can be empty/null)
+      // Check if the underlying pointer is valid before calling GetName()
+      const OrtValueInfo* output_ptr = outputs[i];
+      if (output_ptr == nullptr) {
+        continue;  // Skip invalid output
+      }
+      std::string output_name = outputs[i].GetName();
+      if (output_name.empty()) {
+        continue;  // Skip empty outputs
+      }
+      if (!first_output) {
         out_names << ", ";
         out_types << ", ";
       }
-      out_names << "%" << SanitizeName(outputs[i].GetName());
+      first_output = false;
+      out_names << "%" << SanitizeName(output_name);
       out_types << FormatTensorType(outputs[i].TypeInfo());
     }
 
     // Build input SSA references.
     std::ostringstream in_names;
     std::ostringstream in_types;
+    bool first_input = true;
     for (size_t i = 0; i < inputs.size(); ++i) {
-      if (i > 0) {
+      // Skip invalid inputs (optional inputs can be empty/null)
+      // Check if the underlying pointer is valid before calling GetName()
+      const OrtValueInfo* input_ptr = inputs[i];
+      if (input_ptr == nullptr) {
+        continue;  // Skip invalid input
+      }
+      std::string input_name = inputs[i].GetName();
+      if (input_name.empty()) {
+        continue;  // Skip empty inputs
+      }
+      if (!first_input) {
         in_names << ", ";
         in_types << ", ";
       }
-      in_names << "%" << SanitizeName(inputs[i].GetName());
+      first_input = false;
+      in_names << "%" << SanitizeName(input_name);
       in_types << FormatTensorType(inputs[i].TypeInfo());
     }
 
