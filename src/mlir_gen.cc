@@ -340,41 +340,70 @@ class MlirGenerator {
     // Build output SSA names and types.
     std::ostringstream out_names;
     std::ostringstream out_types;
+    bool first_output = true;
+    size_t valid_output_count = 0;
     for (size_t i = 0; i < outputs.size(); ++i) {
-      if (i > 0) {
+      if (!outputs[i]) {
+        // Skip invalid outputs (optional outputs can be empty/null).
+        continue;
+      }
+      std::string output_name = outputs[i].GetName();
+      if (output_name.empty()) {
+        // Skip empty outputs.
+        continue;
+      }
+      if (!first_output) {
         out_names << ", ";
         out_types << ", ";
       }
-      out_names << "%" << SanitizeName(outputs[i].GetName());
+      first_output = false;
+      valid_output_count++;
+      out_names << "%" << SanitizeName(output_name);
       out_types << FormatTensorType(outputs[i].TypeInfo());
     }
 
     // Build input SSA references.
     std::ostringstream in_names;
     std::ostringstream in_types;
+    bool first_input = true;
     for (size_t i = 0; i < inputs.size(); ++i) {
-      if (i > 0) {
+      if (!inputs[i]) {
+        // Skip invalid inputs (optional inputs can be empty/null).
+        continue;
+      }
+      std::string input_name = inputs[i].GetName();
+      if (input_name.empty()) {
+        continue;
+      }
+      if (!first_input) {
         in_names << ", ";
         in_types << ", ";
       }
-      in_names << "%" << SanitizeName(inputs[i].GetName());
+      first_input = false;
+      in_names << "%" << SanitizeName(input_name);
       in_types << FormatTensorType(inputs[i].TypeInfo());
     }
 
     // Build attributes.
     std::string attr_str = FormatAttributes(attrs);
 
+    // Format output types: wrap in parentheses if multiple outputs.
+    std::string out_types_str = out_types.str();
+    if (valid_output_count > 1 && !out_types_str.empty()) {
+      out_types_str = "(" + out_types_str + ")";
+    }
+
     // Emit the operator.
     constexpr std::string_view schema =
         R"(    {0} = torch.operator "onnx.{1}"({2}) {{{3}}} : ({4}) -> {5}
 )";
     out_ << std::format(schema,
-                        out_names.str(),   // {0}
-                        op_type,           // {1}
-                        in_names.str(),    // {2}
-                        attr_str,          // {3}
-                        in_types.str(),    // {4}
-                        out_types.str());  // {5}
+                        out_names.str(),  // {0}
+                        op_type,          // {1}
+                        in_names.str(),   // {2}
+                        attr_str,         // {3}
+                        in_types.str(),   // {4}
+                        out_types_str);   // {5}
   }
 
   std::string FormatAttributes(const std::vector<Ort::ConstOpAttr>& attrs) {
